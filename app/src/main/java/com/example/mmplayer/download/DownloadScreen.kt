@@ -2,6 +2,7 @@ package com.example.mmplayer.download
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -9,7 +10,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.PlayArrow
@@ -37,10 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.core.net.toUri
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.NavController
-import com.example.mmplayer.NavigationItem
 import com.example.mmplayer.player.Music
 import com.example.mmplayer.player.MusicManager
 import java.io.File
@@ -65,15 +64,19 @@ fun getRandomColor(): Color {
 @SuppressLint("MutableCollectionMutableState")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun VideoPlayerExo(context: Context, player: ExoPlayer, navController: NavController) {
+fun VideoPlayerExo(context: Context) {
     var selectedChip by remember { mutableStateOf(setOf<String>()) }
     var downloadList by remember { mutableStateOf(MusicManager.getPlayList()) }
 
+
     fun filterSongsByGenres(songs: List<Music>): List<Music> {
+        // if no music is selected, return all music
         return if (selectedChip.isEmpty()) {
-            songs // Returnează toate cântecele dacă nu este selectat niciun gen
+            songs //
         } else {
+            // filter the songs to include only those that have at least one of the selected genres
             songs.filter { song ->
+                // check if the song has at least one of the selected genres
                 selectedChip.any { genre -> song.genre.contains(genre, ignoreCase = true) }
             }
         }
@@ -85,6 +88,9 @@ fun VideoPlayerExo(context: Context, player: ExoPlayer, navController: NavContro
         filteredSongs = filterSongsByGenres(MusicManager.getPlayList())
     }
 
+    // this block of code launches an effect that recomposes the composable when the downloadList changes
+    // basically it triggers a recomposition
+    // it is particularly useful for executing asynchronous situations
     LaunchedEffect(Unit) {
         downloadList = MusicManager.getPlayList()
     }
@@ -96,11 +102,14 @@ fun VideoPlayerExo(context: Context, player: ExoPlayer, navController: NavContro
               FilterChip(
                   selected = genre in selectedChip,
                   onClick = {
-                      selectedChip = if (genre in selectedChip) {
-                          selectedChip - genre
+                      selectedChip = if (genre in selectedChip) { // if the genre is selected
+                          selectedChip - genre // remove it from selected genres
                       } else {
-                          selectedChip + genre
+                          selectedChip + genre // add it to selected genres
                       }
+
+                      // update the filtered songs based on the selected genres
+                      // call the filterSongsByGenres function to filter the songs
                       filteredSongs = filterSongsByGenres(downloadList)
                   },
                   label = { Text(genre) },
@@ -147,11 +156,11 @@ fun VideoPlayerExo(context: Context, player: ExoPlayer, navController: NavContro
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             IconButton(onClick = {
-
+                              // inca nu i am dat de cap aici
                             }){
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
-                                    contentDescription = "play",
+                                    contentDescription = "play/pause",
                                     tint = Color.Black
                                 )
                             }

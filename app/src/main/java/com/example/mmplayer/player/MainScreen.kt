@@ -58,6 +58,15 @@ import kotlinx.coroutines.delay
 @Composable
 fun SongScreen(playList: MutableList<Music>, player: ExoPlayer){
 
+    val isPlaying = remember { mutableStateOf(false) }
+
+    val currentPosition = remember { mutableLongStateOf(0) }
+
+    val sliderPosition = remember { mutableLongStateOf(0) }
+
+    val totalDuration = remember { mutableLongStateOf(0) }
+
+
     val pagerState = rememberPagerState(pageCount = { playList.count() })
     val playingSongIndex = remember {
         mutableIntStateOf(0)
@@ -75,8 +84,6 @@ fun SongScreen(playList: MutableList<Music>, player: ExoPlayer){
         )
     }
 
-    val context = LocalContext.current
-
     LaunchedEffect(Unit) {
         playList.forEach {
             val path =  it.music
@@ -86,24 +93,6 @@ fun SongScreen(playList: MutableList<Music>, player: ExoPlayer){
         }
     }
     player.prepare()
-
-
-    val isPlaying = remember {
-        mutableStateOf(false)
-    }
-
-    val currentPosition = remember {
-        mutableLongStateOf(0)
-    }
-
-    val sliderPosition = remember {
-        mutableLongStateOf(0)
-    }
-
-    val totalDuration = remember {
-        mutableLongStateOf(0)
-    }
-
 
     LaunchedEffect(key1 = player.currentPosition, key2 = player.isPlaying) {
         delay(1000)
@@ -152,13 +141,13 @@ fun SongScreen(playList: MutableList<Music>, player: ExoPlayer){
                 )
             }
 
+            // animate the display of the song's name using animated content
+            // animate content is used for animating the transition between states
 
-
-            /***
-             * Animated texts includes song name and its artist
-             * Animates when the song is switching
-             */
-            AnimatedContent(targetState = playingSongIndex.intValue, transitionSpec = {
+            // target state to animate to
+            AnimatedContent(targetState = playingSongIndex.intValue,
+            // define the transition animation when the target state changes
+                transitionSpec = {
                 (scaleIn() + fadeIn()) with (scaleOut() + fadeOut())
             }, label = "") {
                 Text(
@@ -179,10 +168,7 @@ fun SongScreen(playList: MutableList<Music>, player: ExoPlayer){
 
             Spacer(modifier = Modifier.height(16.dp))
 
-
-            /***
-             * Includes animated song album cover
-             */
+            // horizontal pager is a horizontal scrollable list
             HorizontalPager(
                 modifier = Modifier.fillMaxWidth(),
                 state = pagerState,

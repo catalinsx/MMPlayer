@@ -172,13 +172,8 @@ class MainActivity : ComponentActivity() {
                         // si byte arrayul devine fisier
                         // ulterior se apeleaza playSong care da play melodiei
                         // cateva remarci:
-                        // playSong pune sigur de la el .mp3, sa nu te trezesti sa pui si tu playSog("ceva.mp3") ca o sa te trezesti cu eroare
-                        // oricum melodiile trimise de server in LIST sunt fara .mp3 deci n ai avea dc sa ai probleme
-                        // nici numele la fisier song.mp3 si song di saveByte... si playSong n ar tb schimbate in mod special pt ca
-                        // o sa si dea override cand vine o piesa noua
-                        // in schimb daca vrei sa pastrezi piesele anterioare in telefon, ca sa nu mai stai sa le descarci de pe server
-                        // poti sa ti faci tu metoda sa verifici daca exista fisieru in internal storage, caz in care nu mai descarci si dai daor play
-                        // numa ca tre sa ti faci si cv variabila globala cu numele la melodie, nu cum e acu song.mp3, da nu cred ca are rost, tu stii
+                        // playSong pune sigur de la el .mp3, sa nu mai pun eu mp3 la finalul fisierului
+                        // oricum melodiile trimise de server in LIST sunt fara .mp3
                         if(response.contains("<EOS>")) {
                             val byteArray = Base64.getDecoder().decode(songString)
                             saveByteArrayToFile(byteArray, "song.mp3")
@@ -190,10 +185,6 @@ class MainActivity : ComponentActivity() {
                             songString += tmpString
                             println("Received from server: $tmpString")
                         }
-
-
-
-
                     }
                     else if(response.startsWith("<LIST>") && response.endsWith("<EOS>")) {
                         val tmpString: String = response.replace("<LIST>", "").replace("<EOS>", "")
@@ -202,7 +193,7 @@ class MainActivity : ComponentActivity() {
 
                         for (song in strSongs) {
 
-                            val splited = song.split("##") // Adjust split character according to server response
+                            val splited = song.split("##")
                             val genre = splited.getOrNull(4) ?: ""
                             val music = Music(
                                 artist = splited[2],
@@ -259,7 +250,6 @@ class MainActivity : ComponentActivity() {
                 Log.d("MP3", "File not renamed")
             }
 
-            // Optionally, you can notify the user that the file has been saved successfully
         } catch (e: Exception) {
             e.printStackTrace()
             Log.d("saveByte", "a intrat in catch")

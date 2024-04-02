@@ -53,6 +53,9 @@ fun MoreScreen(){
     ) {
 
         fun stopProgress() {
+            // launch a coroutine on main dispatcher
+            // a coroutine is a powerful way to handle async tasks
+            // main dispatcher is the main thread used for ui updates
             CoroutineScope(Dispatchers.Main).launch {
                 delay(15000)
                 updater = false
