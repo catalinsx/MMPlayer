@@ -1,13 +1,9 @@
 package com.example.mmplayer
 
-import android.media.AudioMetadata
-import android.media.MediaMetadata
 import android.media.MediaMetadataRetriever
-import android.media.MediaPlayer
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
@@ -15,17 +11,24 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.net.toUri
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.mmplayer.more.MoreScreen
-import com.example.mmplayer.music.MusicManager
-import com.example.mmplayer.music.SongScreen
+import com.example.mmplayer.music.MoreScreen
+import com.example.mmplayer.player.Music
+import com.example.mmplayer.player.MusicManager
+import com.example.mmplayer.player.SongScreen
 import com.example.mmplayer.ui.theme.MMPlayerTheme
-import com.example.mmplayer.video.VideoPlayerExo
+import com.example.mmplayer.download.VideoPlayerExo
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -39,11 +42,10 @@ import java.net.Socket
 import java.util.Base64
 
 
-val serverAddress = "192.168.0.189" // iti pui ipu tau aici
-val serverPort = 7777
+const val serverAddress = "192.168.0.189" // iti pui ipu tau aici
+const val serverPort = 7777
 lateinit var socket: Socket
-var mediaPlayer: MediaPlayer = MediaPlayer()
-var songList = mutableListOf<String>()
+var songList: MutableList<Music> = mutableListOf()
 
 class MainActivity : ComponentActivity() {
 
@@ -54,70 +56,65 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         player = ExoPlayer.Builder(this).build()
-        val playList = MusicManager.getPlayList()
-        val packageName = packageName
-        val videoUrl =
-            "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
         val mmr = MediaMetadataRetriever()
+
+        val directory = File(applicationContext.filesDir.absolutePath)
+        directory.listFiles()?.forEach {
+            println(it.name)
+            if (it.name.endsWith(".mp3")) {
+                println("File found")
+
+                mmr.setDataSource(this@MainActivity, it.toUri())
+
+                val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                val genre = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
+
+                Log.d("MP3", "title=$title," +
+                        " artist=$artist, duration=$duration ,album=$album, genre=$genre"
+                )
+
+                MusicManager.addMusic(
+                    artist = artist ?: "Unknown",
+                    name = title ?: "Unknown",
+                    music = it.path,
+                    album = album ?: "Unknown",
+                    genre = genre ?: "Unknown",
+                )
+            }
+        }
 
 
         setContent {
-
             MMPlayerTheme {
-
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-
-
                     val navController = rememberNavController()
                     Column {
                         NavHost(
                             navController = navController,
-                            startDestination = "More",
+                            startDestination = "Music",
                             modifier = Modifier.weight(1f)
                         ) {
-                            composable("Video") {
-                                VideoPlayerExo(videoUrl = videoUrl)
+                            composable("Downloaded") {
+                                Log.d("composable", "Video")
+                               // deleteAllMusicFiles()
+                                VideoPlayerExo(this@MainActivity)
                             }
-                            composable("Music") {
-
-                                MusicManager.deletePlayList()
-                                val directory = File(applicationContext.filesDir.absolutePath)
-                                directory.listFiles()?.forEach {
-                                    println(it.name)
-                                    if (it.name.endsWith(".mp3")) {
-                                        println("File found")
-
-                                        mmr.setDataSource(this@MainActivity, it.toUri())
-
-
-                                        val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
-                                        val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
-                                        val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-                                        val cover = mmr.embeddedPicture
-
-                                        Log.d("MP3", "title=$title, artist=$artist, duration=$duration")
-
-                                        MusicManager.addMusic(
-                                            artist = artist ?: "Unknown",
-                                            name = title ?: "Unknown",
-                                            music = it.path,
-                                            cover = 0
-
-                                        )
-                                    }
-                                }
+                            composable("Player") {
+                                Log.d("composable", "Music")
+                              //  MusicManager.deletePlayList()
                                 SongScreen(
                                     playList = MusicManager.getPlayList(),
                                     player = player
                                 )
                             }
-                            composable("More") {
-                                //songList.clear()
-                                sendMessageToServer("<LIST>\r\n")
-                                connectToServer()
+                            composable("Music") {
+                                Checker()
                                 MoreScreen()
                             }
                         }
@@ -130,6 +127,20 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @Composable
+    fun Checker() {
+        var messageSent by remember { mutableStateOf(false) }
+
+        LaunchedEffect(Unit) {
+            if (!messageSent) {
+                songList.clear()
+                sendMessageToServer("<LIST>\r\n")
+                messageSent = true
+            }
+        }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
     @RequiresApi(Build.VERSION_CODES.O)
     fun connectToServer() {
         GlobalScope.launch(Dispatchers.IO) {
@@ -150,11 +161,11 @@ class MainActivity : ComponentActivity() {
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 val input = BufferedReader(InputStreamReader(socket.getInputStream()))
-                var response: String
+                var response: String // Changed to nullable String
                 var songString: String = ""
-
+                // Read the first line outside the loop
                 while (input.readLine().also { response = it } != null) {
-
+                    Log.i("ChrUpdateT", response)
                     if(response.startsWith("<PLAY>")) {
                         //daca cotine <EOS> stim ca s-a terminat de trimis, si facem pasii inversi facuti in server
                         // anume stringu devien un byte array
@@ -172,12 +183,10 @@ class MainActivity : ComponentActivity() {
                             val byteArray = Base64.getDecoder().decode(songString)
                             saveByteArrayToFile(byteArray, "song.mp3")
 
-                          //  playSong("song")
+                            //  playSong("song")
                             songString = ""
-                            connectToServer() //temporar
                         } else {
-                            var tmpString: String
-                            tmpString = response.replace("<PLAY>", "")
+                            val tmpString: String = response.replace("<PLAY>", "")
                             songString += tmpString
                             println("Received from server: $tmpString")
                         }
@@ -187,23 +196,36 @@ class MainActivity : ComponentActivity() {
 
                     }
                     else if(response.startsWith("<LIST>") && response.endsWith("<EOS>")) {
-                        var tmpString: String = response.replace("<LIST>", "").replace("<EOS>", "")
+                        val tmpString: String = response.replace("<LIST>", "").replace("<EOS>", "")
                         val strSongs = tmpString.split(";")
 
-                        for(song in strSongs) {
-                            songList.add(song)
-                            println(song)
+
+                        for (song in strSongs) {
+
+                            val splited = song.split("##") // Adjust split character according to server response
+                            val genre = splited.getOrNull(4) ?: ""
+                            val music = Music(
+                                artist = splited[2],
+                                name = splited[1],
+                                music = splited[0],
+                                album = splited[3],
+                                genre = genre.ifEmpty { "Unknown" },
+                            )
+                           // val musicString = "${music.artist} - ${music.name} - ${music.album} - ${music.genre}"
+
+                            songList.add(music)
+                            //Log.d("song", song)
+                             Log.d("musicList", music.toString())
                         }
-
-                        connectToServer() //temporar
+                        Log.d("songList", songList.toString())
                     }
-
                 }
             } catch (e: Exception) {
                 println("Error: ${e.message}")
             }
         }
     }
+
 
     fun saveByteArrayToFile(byteArray: ByteArray, fileName: String) {
         try {
@@ -222,8 +244,10 @@ class MainActivity : ComponentActivity() {
             val title = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
             val artist = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
             val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            val album = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+            val genre = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_GENRE)
 
-            Log.d("MP3", "title=$title, artist=$artist, duration=$duration")
+            Log.d("MP3", "title=$title, artist=$artist, duration=$duration, album=$album, genre=$genre")
 
             val currentFile = File(applicationContext.filesDir.absolutePath + "/song.mp3")
             val newFile = File(applicationContext.filesDir.absolutePath + "/$title - $artist.mp3")
@@ -238,12 +262,13 @@ class MainActivity : ComponentActivity() {
             // Optionally, you can notify the user that the file has been saved successfully
         } catch (e: Exception) {
             e.printStackTrace()
-            // Handle errors, such as permission issues or IO exceptions
+            Log.d("saveByte", "a intrat in catch")
         }
     }
 
 }
 
+@OptIn(DelicateCoroutinesApi::class)
 fun sendMessageToServer(message: String) {
     GlobalScope.launch(Dispatchers.IO) {
         try {
@@ -261,6 +286,4 @@ fun sendMessageToServer(message: String) {
             println("Error: ${e.message}")
         }
     }
-
-
 }
